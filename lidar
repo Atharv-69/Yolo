@@ -1,0 +1,122 @@
+import serial
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+# --------- Kalman Filter Class ---------
+class KalmanFilter:
+    def _init_(self, process_variance, measurement_variance):
+        self.process_variance = process_variance
+        self.measurement_variance = measurement_variance
+        self.estimated_value = 0.0
+        self.error_estimate = 1.0
+
+    def update(self, measurement):
+        kalman_gain = self.error_estimate / (self.error_estimate + self.measurement_variance)
+        self.estimated_value += kalman_gain * (measurement - self.estimated_value)
+        self.error_estimate = (1 - kalman_gain) * self.error_estimate + abs(self.estimated_value) * self.process_variance
+        return self.estimated_value
+
+# --------- Serial Setup ---------
+ser = serial.Serial('COM8', 115200, timeout=1)
+
+# --------- Grid Map Setup ---------
+map_size = 15  # meters
+resolution = 0.05  # finer resolution for more accurate distance mapping
+grid_size = int(map_size / resolution)
+grid_map = np.zeros((grid_size, grid_size), dtype=np.uint8)
+
+robot_x = grid_size // 2
+robot_y = grid_size // 2
+
+# --------- Orientation Correction ---------
+# Specify the rotation offset (in degrees) to adjust the orientation of the LIDAR scan
+rotation_offset = 90  # Change this if needed to match the correct front
+
+# --------- Kalman Filter Init ---------
+kalman = KalmanFilter(process_variance=0.01, measurement_variance=0.05)
+
+# --------- Data Parsing ---------
+def parse_data(data):
+    if data[0] != 0xAA or data[1] != 0x55:
+        return None
+
+    sample_count = data[3]
+    if sample_count <= 1:
+        return []
+
+    angle_fsa = (data[4] + (data[5] << 8)) / 100.0
+    angle_lsa = (data[6] + (data[7] << 8)) / 100.0
+    angle_diff = (angle_lsa - angle_fsa + 360) % 360
+    angle_step = angle_diff / (sample_count - 1)
+
+    points = []
+    calibration_factor = 1.5  # Adjust if your LIDAR gives slightly off distances
+    for i in range(sample_count):
+        idx = 8 + i * 2
+        if idx + 1 >= len(data):
+            break
+        r = data[idx] + (data[idx + 1] << 8)
+        angle = (angle_fsa + angle_step * i) % 360
+        if r != 0:
+            raw_distance = (r / 1000.0) * calibration_factor  # Convert mm to meters
+            # filtered_distance = kalman.update(raw_distance)
+            filtered_distance = raw_distance  # Apply Kalman filter
+            if 0.12 <= filtered_distance <= 8.0:
+                # Adjust angle by applying the rotation offset
+                theta = np.deg2rad((angle + rotation_offset) % 360)
+                x = filtered_distance * np.cos(theta)
+                y = filtered_distance * np.sin(theta)
+                points.append((x, y, filtered_distance))
+    return points
+
+# --------- Plot Setup ---------
+fig, ax = plt.subplots()
+img = ax.imshow(grid_map, cmap='gray', origin='lower',
+                extent=[-map_size/2, map_size/2, -map_size/2, map_size/2])
+
+# Crosshairs & Labels
+ax.axhline(0, color='red', linestyle='--', linewidth=0.5)
+ax.axvline(0, color='red', linestyle='--', linewidth=0.5)
+ax.text(0, map_size/2 - 0.5, 'FRONT', color='green', ha='center', fontsize=10, fontweight='bold')
+ax.text(0, -map_size/2 + 0.2, 'BACK', color='green', ha='center', fontsize=10, fontweight='bold')
+ax.text(-map_size/2 + 0.3, 0, 'LEFT', color='blue', va='center', rotation='vertical', fontsize=10, fontweight='bold')
+ax.text(map_size/2 - 0.3, 0, 'RIGHT', color='blue', va='center', rotation='vertical', fontsize=10, fontweight='bold')
+
+plt.title("🧭 YDLIDAR X2 - Obstacle Map (Filtered)")
+plt.xlabel("X (meters)")
+plt.ylabel("Y (meters)")
+
+# --------- Clear Map ---------
+def clear_map():
+    global grid_map
+    grid_map.fill(0)
+
+# --------- Animation Update ---------
+def update(frame):
+    global grid_map
+    clear_map()
+
+    while ser.in_waiting >= 120:
+        byte = ser.read()
+        if byte == b'\xAA' and ser.read() == b'\x55':
+            packet = byte + b'\x55' + ser.read(118)
+            points = parse_data(packet)
+            if points:
+                for x, y, dist in points:
+                    gx = int((x / resolution) + robot_x)
+                    gy = int((y / resolution) + robot_y)
+                    if 0 <= gx < grid_size and 0 <= gy < grid_size:
+                        grid_map[gy, gx] = 255
+
+    grid_map[robot_y, robot_x] = 128
+    grid_flipped = np.fliplr(grid_map)  # Flip the map to ensure correct orientation
+    img.set_data(grid_flipped)
+    img.set_clim(0, 255)
+    return [img]
+
+# --------- Start Animation ---------
+ani = animation.FuncAnimation(fig, update, interval=100, blit=True, cache_frame_data=False)
+plt.show()
+
+ser.close()
