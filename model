@@ -1,52 +1,28 @@
+import torch
 import cv2
-import numpy as np
-from tflite_runtime.interpreter import Interpreter
 
-# Load the TFLite model
-interpreter = Interpreter(model_path="model.tflite")
-interpreter.allocate_tensors()
+# Load YOLOv5 model (make sure yolov5s.pt is in the same directory or provide full path)
+model = torch.hub.load('ultralytics/yolov5', 'yolov5s', source='local')  # source='local' uses your cloned repo
 
-# Get model input/output details
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+# Phone camera stream URL
+url = "http://192.168.X.X:8080/video"  # Replace with your phone's IP
 
-# Load class labels from file
-with open("labels.txt", "r") as f:
-    labels = [line.strip() for line in f.readlines()]
-
-# Access phone camera stream via IP Webcam
-cam_url = "http://192.168.1.101:8080/video"  # Update with your phone's IP
-cap = cv2.VideoCapture(cam_url)
-
-# Function to preprocess frame
-def preprocess(frame):
-    img = cv2.resize(frame, (224, 224))  # Adjust if your model uses other size
-    img = np.expand_dims(img, axis=0).astype(np.float32) / 255.0
-    return img
+cap = cv2.VideoCapture(url)
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        print("Failed to grab frame.")
+        print("Failed to grab frame")
         break
 
-    input_data = preprocess(frame)
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-    interpreter.invoke()
-    output = interpreter.get_tensor(output_details[0]['index'])
+    # Inference
+    results = model(frame)
 
-    # Get the prediction
-    label_idx = int(np.argmax(output))
-    label = labels[label_idx]
-    confidence = output[0][label_idx]
+    # Draw results on the frame
+    annotated_frame = results.render()[0]
 
-    # Overlay label on the frame
-    text = f"{label} ({confidence:.2f})"
-    cv2.putText(frame, text, (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-    cv2.imshow("Real-Time Classification", frame)
-
+    # Show the frame
+    cv2.imshow("YOLOv5 - Phone Camera", annotated_frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
