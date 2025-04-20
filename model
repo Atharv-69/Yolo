@@ -1,30 +1,80 @@
-import torch
 import cv2
+import torch
+import threading
+import time
+import numpy as np
 
-# Load YOLOv5 model (make sure yolov5s.pt is in the same directory or provide full path)
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s', source='local')  # source='local' uses your cloned repo
+class VideoStream:
+    def __init__(self, src=0):
+        self.stream = cv2.VideoCapture(src)
+        if not self.stream.isOpened():
+            raise Exception("Failed to open camera")
+        self.ret, self.frame = self.stream.read()
+        self.stopped = False
+        self.lock = threading.Lock()
 
-# Phone camera stream URL
-url = "http://192.168.X.X:8080/video"  # Replace with your phone's IP
+    def start(self):
+        threading.Thread(target=self.update, daemon=True).start()
+        return self
 
-cap = cv2.VideoCapture(url)
+    def update(self):
+        while not self.stopped:
+            ret, frame = self.stream.read()
+            with self.lock:
+                self.ret = ret
+                self.frame = frame
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Failed to grab frame")
-        break
+    def read(self):
+        with self.lock:
+            frame = self.frame.copy()
+        return frame
 
-    # Inference
-    results = model(frame)
+    def stop(self):
+        self.stopped = True
+        self.stream.release()
 
-    # Draw results on the frame
-    annotated_frame = results.render()[0]
+# Change this to your video source:
+# 0 for USB cam, or 'http://<ip>:<port>/video' for phone IP cam
+video_source = 0
 
-    # Show the frame
-    cv2.imshow("YOLOv5 - Phone Camera", annotated_frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+# Load YOLOv5 model
+model = torch.hub.load('/home/rpieice/yolov5_pi/yolov5', 'custom', path='yolov5n.pt', source='local')
+model.conf = 0.5
+model.max_det = 5
 
-cap.release()
-cv2.destroyAllWindows()
+# Initialize video stream
+vs = VideoStream(src=video_source).start()
+time.sleep(2.0)  # let camera warm up
+
+frame_skip = 2
+frame_count = 0
+
+try:
+    while True:
+        frame = vs.read()
+        frame_count += 1
+
+        # Only process every Nth frame
+        if frame_count % frame_skip != 0:
+            continue
+
+        # Resize for performance
+        resized = cv2.resize(frame, (320, 320))
+
+        # Run YOLOv5 inference
+        results = model(resized)
+
+        # Render results
+        annotated = np.squeeze(results.render())
+        cv2.imshow("YOLOv5 Detection", annotated)
+
+        # Press 'q' to quit
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+except KeyboardInterrupt:
+    print("Stopped by user")
+
+finally:
+    vs.stop()
+    cv2.destroyAllWindows()
