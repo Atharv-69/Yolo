@@ -125,3 +125,26 @@ ani = animation.FuncAnimation(fig, update, interval=100, blit=True, cache_frame_
 plt.show()
 
 ser.close()
+
+
+
+
+
+
+
+
+g++ -o ultra_simple main.cpp \
+  ../../sdk/src/rplidar_driver.cpp \
+  ../../sdk/src/sl_lidar_driver.cpp \
+  ../../sdk/src/sl_serial_channel.cpp \
+  ../../sdk/src/sl_crc.cpp \
+  ../../sdk/src/sl_lidar_protocol_codec.cpp \
+  ../../sdk/src/hal/universal_creator.cpp \
+  ../../sdk/src/arch/linux/net_serial.cpp \
+  ../../sdk/src/arch/linux/net_udp.cpp \
+  ../../sdk/src/arch/linux/net_tcp.cpp \
+  ../../sdk/src/arch/linux/serial_channel.cpp \
+  ../../sdk/src/arch/linux/timer.cpp \
+  -I../../sdk/include \
+  -I../../sdk/src \
+  -lpthread
