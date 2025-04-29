@@ -133,18 +133,34 @@ ser.close()
 
 
 
-g++ -o ultra_simple main.cpp \
-  ../../sdk/src/rplidar_driver.cpp \
-  ../../sdk/src/sl_lidar_driver.cpp \
-  ../../sdk/src/sl_serial_channel.cpp \
-  ../../sdk/src/sl_crc.cpp \
-  ../../sdk/src/sl_lidar_protocol_codec.cpp \
-  ../../sdk/src/hal/universal_creator.cpp \
-  ../../sdk/src/arch/linux/net_serial.cpp \
-  ../../sdk/src/arch/linux/net_udp.cpp \
-  ../../sdk/src/arch/linux/net_tcp.cpp \
-  ../../sdk/src/arch/linux/serial_channel.cpp \
-  ../../sdk/src/arch/linux/timer.cpp \
-  -I../../sdk/include \
-  -I../../sdk/src \
-  -lpthread
+from rplidar import RPLidar
+import time
+
+PORT_NAME = '/dev/ttyUSB0'  # Change if needed
+DIST_THRESHOLD_MM = 500  # 50 cm
+
+def run():
+    lidar = RPLidar(PORT_NAME)
+    try:
+        print("Scanning... Press Ctrl+C to stop.")
+        for scan in lidar.iter_scans():
+            close_points = [
+                (angle, dist)
+                for (_, angle, dist) in scan
+                if 0 < dist <= DIST_THRESHOLD_MM
+            ]
+
+            print(f"\n{len(close_points)} point(s) within 50cm:")
+            for angle, dist in close_points:
+                print(f"  Angle: {angle:.1f}°, Distance: {dist:.1f} mm")
+
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("Stopping...")
+    finally:
+        lidar.stop()
+        lidar.disconnect()
+
+if __name__ == '__main__':
+    run()
