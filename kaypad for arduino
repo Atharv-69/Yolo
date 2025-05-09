@@ -1,0 +1,142 @@
+#include <Keypad.h>
+
+const byte ROWS = 4;
+const byte COLS = 4;
+
+char hexaKeys [ROWS] [COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'},
+};
+
+char customKey;
+
+byte rowPins[ROWS] = {9,8,7,6};  
+byte colPins[COLS] = {5,4,3,2}; 
+
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys) , rowPins , colPins , ROWS , COLS );
+
+int phone_no_size = 10;
+char phone_no[10];
+int data_count = 0;
+
+// #define btn 34;
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+}
+
+void loop() {
+  // char j=customKey;
+  // int i=0;
+  // if(j=='A'){
+  //   Serial.println("in a loop");
+  // switch (customKey){
+  // case 'C':
+  //   char pn = customKeypad.getKey();
+  //     if(pn){
+  //     phone_no[data_count] = pn;
+  //     delay(200);
+  //     Serial.print(phone_no[data_count]);
+  //     data_count++;
+  //     Serial.println(customKey);
+  //     }
+  // break;
+  // case 'D':
+  //   Serial.println("hello");
+  // }
+  //   Serial.print("exiting");
+  // }
+
+  //   char pn = customKeypad.getKey();
+  // char c = pn;
+  // if(c=='*'){
+  // if(data_count == phone_no_size){
+  //   Serial.print(phone_no);
+  // }
+  // else{
+  //   Serial.println("wrong ph no");
+  // }
+  // }
+//   int x=digitalRead(34);
+//   if(x==1){
+//     // digitalWrite(34,LOW);
+//     Serial.println(phone_no);
+//   }
+// }
+  // delay(1000);
+  // if(customKey){
+  // char i = customKey;
+  // delay(200);
+  // Serial.println(i);
+  // }
+
+//   for(int i=0;i<=9;i++){
+//     phone_no[i] = customKey;
+//   }
+//   for(int j=0;j<=9;j++){
+//     Serial.println(phone_no[j]);
+//   }
+// }
+
+// void check_no{
+//     if(data_count == phone_no_size){
+//     }
+
+
+
+// int i =0;
+// while(i<=9){
+//   if(customKey){
+//   delay(200);
+//   phone_no[i]=customKey;
+//   Serial.println(phone_no[i]);
+//   i++;
+//   }
+// }
+//   char chk = customKeypad.getKey();
+//   if(chk=='A'){
+//   Serial.println(phone_no);
+//   }
+
+
+// char a = customKeypad.getKey();
+// if(a=='A'){
+//   for(int i=0;i<=9;i++){
+//     Serial.println("in for");
+//     customKey = customKeypad.getKey();
+//     if(customKey){
+//     Serial.println("in if");
+//       phone_no[i]=customKey;
+//       Serial.print(customKey);
+//     }  
+//     Serial.println("exiting for");
+//     Serial.println(i);
+//   }
+// }
+//   char chk = customKeypad.getKey();
+//   phone_no[10]=chk;
+//   if(phone_no[10]=='D'){
+//   Serial.println("in other if ");
+//   Serial.println(phone_no);
+//   }
+
+  for(int i=1;i>0;i++){
+    char j = customKeypad.getKey();
+    // delay(200);                                                                       
+    if(j){
+      phone_no[data_count] = j;
+      Serial.println(j);
+      data_count=data_count+1;
+      if(data_count>=13){
+        Serial.println(phone_no);
+        break;
+      }
+    }
+  }
+  data_count=0;
+  Serial.println("out of for");
+  delay(1000);
+}
